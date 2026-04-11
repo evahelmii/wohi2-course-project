@@ -8,7 +8,7 @@ const postsRouter = require("./routes/posts");
 app.use(express.json());
 
 // everything under /api/posts
-app.use("/api/posts", postsRouter);
+app.use("/api/questions", postsRouter);
 
 app.use((req, res) => {
   res.json({msg: "Not found"});
