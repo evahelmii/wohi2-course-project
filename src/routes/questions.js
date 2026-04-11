@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const posts = require("../data/posts");
+const posts = require("../data/questions");
 
 router.get("/", (req, res) => {
   res.json(posts);
@@ -84,6 +84,5 @@ router.delete("/:postId", (req, res) => {
     post: deletedPost[0]
   });
 });
-
 
 module.exports = router;
