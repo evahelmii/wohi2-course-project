@@ -3,16 +3,8 @@ const router = express.Router();
 
 const posts = require("../data/posts");
 
-// GET /posts 
-// List all posts
 router.get("/", (req, res) => {
-  const { keyword } = req.query;
-
-  if (!keyword) {
-    return res.json(posts);
-  }
-
-  res.json(filteredPosts);
+  res.json(posts);
 });
 
 // GET /posts/:postId
@@ -92,8 +84,6 @@ router.delete("/:postId", (req, res) => {
     post: deletedPost[0]
   });
 });
-
-
 
 
 module.exports = router;
