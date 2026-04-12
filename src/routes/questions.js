@@ -1,24 +1,24 @@
 const express = require("express");
 const router = express.Router();
 
-const posts = require("../data/questions");
+const quiz = require("../data/questions");
 
 router.get("/", (req, res) => {
-  res.json(posts);
+  res.json(quiz);
 });
 
 // GET /posts/:postId
 // Show a specific post
-router.get("/:postId", (req, res) => {
-  const postId = Number(req.params.postId);
+router.get("/:questionId", (req, res) => {
+  const questionId = Number(req.params.questionId);
 
-  const post = posts.find((p) => p.id === postId);
+  const question = quiz.find((q) => q.id === questionId);
 
-  if (!post) {
+  if (!question) {
     return res.status(404).json({ message: "Question not found" });
   }
 
-  res.json(post);
+  res.json(question);
 });
 
 // POST /posts
@@ -28,29 +28,29 @@ router.post("/", (req, res) => {
 
   if (!question || !answer) {
     return res.status(400).json({
-      message: "question and answer are required"
+      message: "Question and answer are required"
     });
   }
-  const maxId = Math.max(...posts.map(p => p.id), 0);
+  const maxId = Math.max(...quiz.map(q => q.id), 0);
 
-  const newPost = {
-    id: posts.length ? maxId + 1 : 1,
+  const newQuestion = {
+    id: quiz.length ? maxId + 1 : 1,
     question,
     answer
   };
-  posts.push(newPost);
-  res.status(201).json(newPost);
+  quiz.push(newQuestion);
+  res.status(201).json(newQuestion);
 });
 
 // PUT /posts/:postId
 // Edit a post
-router.put("/:postId", (req, res) => {
-  const postId = Number(req.params.postId);
+router.put("/:questionId", (req, res) => {
+  const questionId = Number(req.params.questionId);
   const { question, answer } = req.body;
 
-  const post = posts.find((p) => p.id === postId);
+  const questionItem = quiz.find((q) => q.id === questionId);
 
-  if (!post) {
+  if (!questionItem) {
     return res.status(404).json({ message: "Question not found" });
   }
 
@@ -60,28 +60,28 @@ router.put("/:postId", (req, res) => {
     });
   }
 
-  post.question = question;
-  post.answer = answer;
+  questionItem.question = question;
+  questionItem.answer = answer;
 
-  res.json(post);
+  res.json(questionItem);
 });
 
 // DELETE /posts/:postId
 // Delete a post
-router.delete("/:postId", (req, res) => {
-  const postId = Number(req.params.postId);
+router.delete("/:questionId", (req, res) => {
+  const questionId = Number(req.params.questionId);
 
-  const postIndex = posts.findIndex((p) => p.id === postId);
+  const questionIndex = quiz.findIndex((q) => q.id === questionId);
 
-  if (postIndex === -1) {
+  if (questionIndex === -1) {
     return res.status(404).json({ message: "Question not found" });
   }
 
-  const deletedPost = posts.splice(postIndex, 1);
+  const deletedQuestion = quiz.splice(questionIndex, 1);
 
   res.json({
     message: "Question deleted successfully",
-    post: deletedPost[0]
+    post: deletedQuestion[0]
   });
 });
 

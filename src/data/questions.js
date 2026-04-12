@@ -1,4 +1,4 @@
-const posts = [
+const question = [
   {
     id: 1,
     question: "What is HTTP?",
@@ -21,4 +21,4 @@ const posts = [
   }
 ];
 
-module.exports = posts;
+module.exports = question;
