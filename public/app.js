@@ -125,7 +125,7 @@ async function loadQuestions(keyword = "", page = 1) {
     const { data: questions, total, totalPages } = result;
     const currentUserId = getCurrentUserId();
 
-    const solvedCount = questions.filter((q) => q[CONFIG.API_FIELDS.SOLVED]).length;
+    const solvedCount = questions.filter((q) => q.attempted).length;
 
     let html = `
       <div class="score-bar">
@@ -153,10 +153,10 @@ async function loadQuestions(keyword = "", page = 1) {
       html += questions
         .map(
           (q) => `
-        <article class="question-card ${q[CONFIG.API_FIELDS.SOLVED] ? "solved-card" : ""}">
+        <article class="question-card ${q.attempted ? "solved-card" : ""}">
           <h3>
             <a href="#" class="question-link" data-id="${q.id}">${q.question}</a>
-            ${q[CONFIG.API_FIELDS.SOLVED] ? `<span class="badge-solved">Solved</span>` : ""}
+            ${q.attempted ? `<span class="badge-solved">Solved</span>` : ""}
           </h3>
           ${
             q.keywords && q.keywords.length
@@ -252,7 +252,7 @@ async function loadQuestionDetail(qId) {
     container.innerHTML = `
       <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
       <article class="question-card question-detail">
-        <h3>${q.question} ${q[CONFIG.API_FIELDS.SOLVED] ? `<span class="badge-solved">Solved</span>` : ""}</h3>
+        <h3>${q.question} ${q.attempted ? `<span class="badge-solved">Solved</span>` : ""}</h3>
         <p class="question-meta">by ${q.userName || "Unknown"}</p>
         ${q.imageUrl ? `<img class="question-image" src="${q.imageUrl}" alt="">` : ""}
         <p class="question-answer">${q.answer}</p>

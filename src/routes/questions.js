@@ -23,9 +23,6 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-
-
-
 function formatQuestion(question) {
   return {
     ...question,
@@ -253,10 +250,25 @@ router.post("/:questionId/play", async (req, res) => {
   const correct =
     answer.trim().toLowerCase() === question.answer.trim().toLowerCase();
 
+  if (correct) {
+  await prisma.attempt.upsert({
+    where: {
+      userId_questionId: {
+        userId: req.user.userId,
+        questionId,
+      },
+    },
+    update: {},
+    create: {
+      userId: req.user.userId,
+      questionId,
+    },
+  });
+}
+
   res.json({
     correct,
     correctAnswer: question.answer,
   });
 });
-
 module.exports = router;
