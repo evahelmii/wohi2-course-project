@@ -5,6 +5,15 @@ const authenticate = require("../middleware/auth");
 const isOwner = require("../middleware/isOwner");
 const multer = require("multer");
 const path = require('path');
+const { z } = require("zod");
+const { NotFoundError, ValidationError } = require("../lib/errors");
+
+const PostInput = z.object({
+  question: z.string().min(1),
+  date: z.string().date(),
+  answer: z.string().min(1),
+  keywords: z.union([z.string(), z.array(z.string())]).optional(),
+});
 
 const storage = multer.diskStorage({
   destination: path.join(__dirname, "..", "..", "public", "uploads"),
@@ -18,7 +27,7 @@ const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith("image/")) cb(null, true);
-    else cb(new Error("Only image files are allowed"));
+    else cb(new ValidationError("Only image files are allowed"));
   },
   limits: { fileSize: 5 * 1024 * 1024 },
 });
@@ -92,9 +101,8 @@ router.get("/:questionId", async (req, res) => {
   });
 
   if (!question) {
-    return res.status(404).json({ 
-		message: "Question not found" 
-    });
+    throw new NotFoundError ("Question not found")
+  
   }
 
   res.json(formatQuestion(question));
@@ -103,14 +111,9 @@ router.get("/:questionId", async (req, res) => {
 
 // POST
 router.post("/", upload.single("image"), async (req, res) => {
-  const { question, date, answer, keywords } = req.body;
-
+  const { question, date, answer, keywords } = PostInput.parse(req.body);
+  
   console.log("DATE:", date);
-
-  if (!question || !answer) {
-    return res.status(400).json({ msg: 
-	"Question and answer are required" });
-  }
 
   const keywordsArray = Array.isArray(keywords) ? keywords : [];
   const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;  
@@ -135,15 +138,15 @@ router.post("/", upload.single("image"), async (req, res) => {
 // PUT
 router.put("/:questionId", upload.single("image"), isOwner, async (req, res) => {
   const questionId = Number(req.params.questionId);
-  const { question, date, answer, keywords } = req.body;
+  const { question, date, answer, keywords } = PostInput.parse(req.body);
 
   const existingQuestion = await prisma.question.findUnique({ where: { id: questionId } });
   if (!existingQuestion) {
-    return res.status(404).json({ message: "Question not found" });
+    throw new NotFoundError( "Question not found" );
   }
 
   if (!question || !answer) {
-    return res.status(400).json({ msg: "Question and answer are required" });
+    throw new ValidationError( "Question and answer are required" );
   }
 
   const keywordsArray = Array.isArray(keywords) ? keywords : [];
@@ -182,7 +185,7 @@ router.delete("/:questionId", isOwner, async (req, res) => {
   });
 
   if (!question) {
-    return res.status(404).json({ message: "Question not found" });
+    throw new NotFoundError("Question not found" );
   }
 
   await prisma.question.delete({ where: { id: questionId } });
@@ -198,7 +201,7 @@ router.post("/:questionId/attempt", async (req, res) => {
 
     const question = await prisma.question.findUnique({ where: { id: questionId } });
     if (!question) {
-        return res.status(404).json({ message: "Question not found" });
+        throw new NotFoundError("Question not found" );
     }
 
     const attempt = await prisma.attempt.upsert({
@@ -223,7 +226,7 @@ router.delete("/:questionId/attempt", async (req, res) => {
 
     const question = await prisma.question.findUnique({ where: { id: questionId } });
     if (!question) {
-        return res.status(404).json({ message: "Question not found" });
+        throw new NotFoundError( "Question not found" );
     }
 
     await prisma.attempt.deleteMany({
@@ -244,7 +247,7 @@ router.post("/:questionId/play", async (req, res) => {
   });
 
   if (!question) {
-    return res.status(404).json({ message: "Question not found" });
+    throw new NotFoundError( "Question not found" );
   }
 
   const correct =
@@ -271,4 +274,14 @@ router.post("/:questionId/play", async (req, res) => {
     correctAnswer: question.answer,
   });
 });
+
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError ||
+      err?.message === "Only image files are allowed") {
+    return res.status(400).json({ msg: err.message });
+  }
+  next(err); // pass through to global handler
+});
+
+
 module.exports = router;
