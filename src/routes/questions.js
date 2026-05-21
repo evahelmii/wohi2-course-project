@@ -10,7 +10,7 @@ const { NotFoundError, ValidationError } = require("../lib/errors");
 
 const PostInput = z.object({
   question: z.string().min(1),
-  date: z.string().date(),
+  date: z.string().optional(),
   answer: z.string().min(1),
   keywords: z.union([z.string(), z.array(z.string())]).optional(),
 });

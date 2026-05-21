@@ -6,7 +6,7 @@ function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith("Bearer ")) {
-    throw new UnauthorizedError("No token provided")
+    throw new UnauthorizedError("No token provided");
   }
 
   const token = authHeader.split(" ")[1];
@@ -16,9 +16,9 @@ function authenticate(req, res, next) {
     req.user = decoded;
     next();
   } catch (err) {
-    reg.log.warn({}, "Error authenticating");
-    throw new ForbiddenError("Invalid or expired token")
-   }
+    console.warn("Error authenticating:", err.message);
+    throw new ForbiddenError("Invalid or expired token");
+  }
 }
 
 module.exports = authenticate;
