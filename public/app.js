@@ -1,7 +1,5 @@
-// --- State ---
 let isRegisterMode = false;
 
-// --- Helpers ---
 function getCurrentUserId() {
   const token = getToken();
   if (!token) return null;
@@ -37,7 +35,12 @@ async function apiFetch(route, options = {}) {
   return data;
 }
 
-// --- Auth ---
+function difficultyBadge(difficulty) {
+  const colors = { easy: "#4caf50", medium: "#ff9800", hard: "#f44336" };
+  const color = colors[difficulty] || colors.medium;
+  return `<span class="badge-difficulty" style="background:${color}">${difficulty || "medium"}</span>`;
+}
+
 function showAuth() {
   document.getElementById("auth-section").style.display = "block";
   document.getElementById("app-section").style.display = "none";
@@ -106,7 +109,6 @@ async function handleAuth(e) {
   }
 }
 
-// --- App ---
 async function showApp() {
   document.getElementById("auth-section").style.display = "none";
   document.getElementById("app-section").style.display = "block";
@@ -114,13 +116,14 @@ async function showApp() {
   await loadQuestions();
 }
 
-async function loadQuestions(keyword = "", page = 1) {
+async function loadQuestions(keyword = "", page = 1, difficulty = "") {
   const container = document.getElementById("questions-container");
   container.innerHTML = '<p class="loading">Loading questions...</p>';
 
   try {
     const params = new URLSearchParams({ page, limit: CONFIG.QUESTIONS_PER_PAGE });
     if (keyword) params.set("keyword", keyword);
+    if (difficulty) params.set("difficulty", difficulty);
     const result = await apiFetch(`${CONFIG.ROUTES.QUESTIONS}?${params}`);
     const { data: questions, total, totalPages } = result;
     const currentUserId = getCurrentUserId();
@@ -139,11 +142,21 @@ async function loadQuestions(keyword = "", page = 1) {
         </div>
       </div>
       <div class="toolbar">
-        <button class="btn btn-primary" id="new-question-btn">+ New Question</button>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button class="btn btn-primary" id="new-question-btn">+ New Question</button>
+          <button class="btn btn-quiz" id="quiz-btn">Quiz</button>
+          <button class="btn btn-leaderboard" id="leaderboard-btn">Leaderboard</button>
+        </div>
         <div class="search-bar">
           <input type="text" id="keyword-input" placeholder="Search by keyword..." value="${keyword}" />
+          <select id="difficulty-select" style="padding:0.5rem;border-radius:6px;border:1px solid #444;background:#2a2a4a;color:#fff">
+            <option value="" ${!difficulty ? "selected" : ""}>All difficulties</option>
+            <option value="easy" ${difficulty === "easy" ? "selected" : ""}>Easy</option>
+            <option value="medium" ${difficulty === "medium" ? "selected" : ""}>Medium</option>
+            <option value="hard" ${difficulty === "hard" ? "selected" : ""}>Hard</option>
+          </select>
           <button class="btn btn-search" id="search-btn">Search</button>
-          ${keyword ? `<button class="btn btn-clear" id="clear-btn">Clear</button>` : ""}
+          ${keyword || difficulty ? `<button class="btn btn-clear" id="clear-btn">Clear</button>` : ""}
         </div>
       </div>`;
 
@@ -157,6 +170,7 @@ async function loadQuestions(keyword = "", page = 1) {
           <h3>
             <a href="#" class="question-link" data-id="${q.id}">${q.question}</a>
             ${q.attempted ? `<span class="badge-solved">Solved</span>` : ""}
+            ${difficultyBadge(q.difficulty)}
           </h3>
           ${
             q.keywords && q.keywords.length
@@ -194,23 +208,29 @@ async function loadQuestions(keyword = "", page = 1) {
     container.innerHTML = html;
 
     document.getElementById("new-question-btn").addEventListener("click", () => showQuestionForm());
+    document.getElementById("quiz-btn").addEventListener("click", () => startQuiz());
+    document.getElementById("leaderboard-btn").addEventListener("click", () => loadLeaderboard());
 
     document.getElementById("search-btn").addEventListener("click", () => {
-      loadQuestions(document.getElementById("keyword-input").value.trim(), 1);
+      loadQuestions(
+        document.getElementById("keyword-input").value.trim(),
+        1,
+        document.getElementById("difficulty-select").value
+      );
     });
 
     document.getElementById("keyword-input").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") loadQuestions(e.target.value.trim(), 1);
+      if (e.key === "Enter") loadQuestions(e.target.value.trim(), 1, document.getElementById("difficulty-select").value);
     });
 
     const clearBtn = document.getElementById("clear-btn");
     if (clearBtn) clearBtn.addEventListener("click", () => loadQuestions());
 
     const prevBtn = document.getElementById("prev-btn");
-    if (prevBtn) prevBtn.addEventListener("click", () => loadQuestions(keyword, page - 1));
+    if (prevBtn) prevBtn.addEventListener("click", () => loadQuestions(keyword, page - 1, difficulty));
 
     const nextBtn = document.getElementById("next-btn");
-    if (nextBtn) nextBtn.addEventListener("click", () => loadQuestions(keyword, page + 1));
+    if (nextBtn) nextBtn.addEventListener("click", () => loadQuestions(keyword, page + 1, difficulty));
 
     container.querySelectorAll(".question-link, .read-more").forEach((el) => {
       el.addEventListener("click", (e) => {
@@ -252,7 +272,7 @@ async function loadQuestionDetail(qId) {
     container.innerHTML = `
       <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
       <article class="question-card question-detail">
-        <h3>${q.question} ${q.attempted ? `<span class="badge-solved">Solved</span>` : ""}</h3>
+        <h3>${q.question} ${q.attempted ? `<span class="badge-solved">Solved</span>` : ""} ${difficultyBadge(q.difficulty)}</h3>
         <p class="question-meta">by ${q.userName || "Unknown"}</p>
         ${q.imageUrl ? `<img class="question-image" src="${q.imageUrl}" alt="">` : ""}
         <p class="question-answer">${q.answer}</p>
@@ -269,7 +289,19 @@ async function loadQuestionDetail(qId) {
               </div>`
             : ""
         }
-      </article>`;
+      </article>
+
+      <div class="comments-section">
+        <h3>Comments</h3>
+        <div id="comments-list"><p class="loading">Loading comments...</p></div>
+        <form id="comment-form" style="margin-top:1rem">
+          <div class="form-group">
+            <textarea id="comment-input" rows="2" placeholder="Write a comment..." style="width:100%"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Post Comment</button>
+        </form>
+        <p id="comment-error" class="error"></p>
+      </div>`;
 
     document.getElementById("back-btn").addEventListener("click", (e) => {
       e.preventDefault();
@@ -280,16 +312,199 @@ async function loadQuestionDetail(qId) {
       document.getElementById("detail-edit-btn").addEventListener("click", () => showQuestionForm(qId));
       document.getElementById("detail-delete-btn").addEventListener("click", () => deleteQuestion(qId));
     }
+
+
+    loadComments(qId);
+
+  
+    document.getElementById("comment-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("comment-error");
+      const content = document.getElementById("comment-input").value.trim();
+      if (!content) return;
+      try {
+        await apiFetch(`${CONFIG.ROUTES.QUESTIONS}/${qId}/comments`, {
+          method: "POST",
+          body: JSON.stringify({ content }),
+        });
+        document.getElementById("comment-input").value = "";
+        loadComments(qId);
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+
   } catch (err) {
     container.innerHTML = `<p class="error">${err.message}</p>`;
   }
 }
 
-// --- Create / Edit ---
+async function loadComments(qId) {
+  const listEl = document.getElementById("comments-list");
+  if (!listEl) return;
+  try {
+    const comments = await apiFetch(`${CONFIG.ROUTES.QUESTIONS}/${qId}/comments`);
+    const currentUserId = getCurrentUserId();
+
+    if (comments.length === 0) {
+      listEl.innerHTML = '<p style="color:#aaa">No comments yet.</p>';
+      return;
+    }
+
+    listEl.innerHTML = comments.map((c) => `
+      <div class="comment-card" data-id="${c.id}">
+        <div class="comment-header">
+          <strong>${c.userName}</strong>
+          <span style="color:#aaa;font-size:0.8rem">${new Date(c.createdAt).toLocaleDateString()}</span>
+          ${c.userId === currentUserId ? `<button class="btn-delete-comment" data-id="${c.id}" style="margin-left:auto;background:none;border:none;color:#f44336;cursor:pointer">Delete</button>` : ""}
+        </div>
+        <p style="margin:0.3rem 0 0">${c.content}</p>
+      </div>
+    `).join("");
+
+    listEl.querySelectorAll(".btn-delete-comment").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        try {
+          await apiFetch(`${CONFIG.ROUTES.QUESTIONS}/${qId}/comments/${btn.dataset.id}`, { method: "DELETE" });
+          loadComments(qId);
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    });
+  } catch (err) {
+    listEl.innerHTML = `<p class="error">${err.message}</p>`;
+  }
+}
+
+async function loadLeaderboard() {
+  const container = document.getElementById("questions-container");
+  container.innerHTML = '<p class="loading">Loading leaderboard...</p>';
+
+  try {
+    const leaderboard = await apiFetch("/api/leaderboard");
+    const medals = ["1", "2", "3", "4", "5"];
+
+    container.innerHTML = `
+      <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
+      <div class="question-form-wrapper">
+        <h2>Leaderboard</h2>
+        <p style="color:#aaa;margin-bottom:1.5rem">Top 5 players with most solved questions</p>
+        ${leaderboard.length === 0
+          ? '<p style="color:#aaa">No data yet.</p>'
+          : leaderboard.map((u) => `
+            <div class="question-card" style="display:flex;align-items:center;gap:1rem;padding:1rem">
+              <span style="font-size:1.5rem">${medals[u.rank - 1] || u.rank}</span>
+              <strong style="flex:1">${u.name}</strong>
+              <span style="color:#ffd700">${u.attemptCount} solved</span>
+            </div>
+          `).join("")}
+      </div>`;
+
+    document.getElementById("back-btn").addEventListener("click", (e) => {
+      e.preventDefault();
+      loadQuestions();
+    });
+  } catch (err) {
+    container.innerHTML = `<p class="error">${err.message}</p>`;
+  }
+}
+
+async function startQuiz() {
+  const container = document.getElementById("questions-container");
+  container.innerHTML = '<p class="loading">Loading quiz...</p>';
+
+  try {
+    const questions = await apiFetch(`${CONFIG.ROUTES.QUESTIONS}/quiz`);
+
+    if (questions.length === 0) {
+      container.innerHTML = `
+        <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
+        <p class="empty-state">Not enough questions for a quiz!</p>`;
+      document.getElementById("back-btn").addEventListener("click", (e) => { e.preventDefault(); loadQuestions(); });
+      return;
+    }
+
+    let currentIndex = 0;
+    let score = 0;
+
+    function showQuizQuestion() {
+      if (currentIndex >= questions.length) {
+        container.innerHTML = `
+          <div class="question-form-wrapper" style="text-align:center">
+            <h2>Quiz Complete!</h2>
+            <p style="font-size:1.5rem;margin:1rem 0">Score: <strong>${score}/${questions.length}</strong></p>
+            <button class="btn btn-primary" id="quiz-again-btn">Play Again</button>
+            <button class="btn" id="back-home-btn" style="margin-left:0.5rem">Back to Questions</button>
+          </div>`;
+        document.getElementById("quiz-again-btn").addEventListener("click", startQuiz);
+        document.getElementById("back-home-btn").addEventListener("click", loadQuestions);
+        return;
+      }
+
+      const q = questions[currentIndex];
+      container.innerHTML = `
+        <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
+        <div class="question-form-wrapper" style="text-align:center">
+          <p style="color:#aaa">Question ${currentIndex + 1} of ${questions.length} &nbsp;|&nbsp; Score: ${score}</p>
+          ${difficultyBadge(q.difficulty)}
+          <div class="play-question-text" style="margin-top:1rem">${q.question}</div>
+          ${q.imageUrl ? `<img class="question-image" src="${q.imageUrl}" alt="" style="margin:1rem auto">` : ""}
+          <form id="quiz-form" style="text-align:left;margin-top:1rem">
+            <div class="form-group">
+              <label for="quiz-answer">Your answer</label>
+              <textarea id="quiz-answer" rows="2" required></textarea>
+            </div>
+            <div style="text-align:center">
+              <button type="submit" class="btn btn-play" style="padding:0.7rem 2.5rem">Submit</button>
+            </div>
+          </form>
+          <div id="quiz-result"></div>
+        </div>`;
+
+      document.getElementById("back-btn").addEventListener("click", (e) => { e.preventDefault(); loadQuestions(); });
+
+      document.getElementById("quiz-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const answer = document.getElementById("quiz-answer").value;
+        const resultEl = document.getElementById("quiz-result");
+
+        try {
+          const result = await apiFetch(`${CONFIG.ROUTES.QUESTIONS}/${q.id}/play`, {
+            method: "POST",
+            body: JSON.stringify({ answer }),
+          });
+
+          if (result.correct) score++;
+
+          resultEl.innerHTML = result.correct
+            ? `<div class="play-result correct" style="margin-top:1rem">Correct! </div>`
+            : `<div class="play-result incorrect" style="margin-top:1rem">Incorrect! The answer was: <strong>${result.correctAnswer}</strong></div>`;
+
+          document.getElementById("quiz-form").style.display = "none";
+
+          const nextBtn = document.createElement("button");
+          nextBtn.className = "btn btn-primary";
+          nextBtn.style.marginTop = "1rem";
+          nextBtn.textContent = currentIndex + 1 < questions.length ? "Next Question →" : "See Results";
+          nextBtn.addEventListener("click", () => { currentIndex++; showQuizQuestion(); });
+          resultEl.appendChild(nextBtn);
+        } catch (err) {
+          resultEl.innerHTML = `<p class="error">${err.message}</p>`;
+        }
+      });
+    }
+
+    showQuizQuestion();
+  } catch (err) {
+    container.innerHTML = `<p class="error">${err.message}</p>`;
+  }
+}
+
 async function showQuestionForm(qId) {
   const container = document.getElementById("questions-container");
   const isEdit = !!qId;
-  let q = { question: "", answer: "", keywords: [] };
+  let q = { question: "", answer: "", keywords: [], difficulty: "medium" };
 
   if (isEdit) {
     try {
@@ -318,6 +533,14 @@ async function showQuestionForm(qId) {
           <input type="text" id="q-keywords" value="${q.keywords ? q.keywords.join(", ") : ""}" />
         </div>
         <div class="form-group">
+          <label for="q-difficulty">Difficulty</label>
+          <select id="q-difficulty" style="padding:0.5rem;border-radius:6px;border:1px solid #444;background:#2a2a4a;color:#fff;width:100%">
+            <option value="easy" ${q.difficulty === "easy" ? "selected" : ""}>Easy</option>
+            <option value="medium" ${q.difficulty === "medium" || !q.difficulty ? "selected" : ""}>Medium</option>
+            <option value="hard" ${q.difficulty === "hard" ? "selected" : ""}>Hard</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label for="q-image">Image ${isEdit ? "(leave blank to keep current)" : "(optional)"}</label>
           <input type="file" id="q-image" accept="image/*" />
           ${isEdit && q.imageUrl ? `<img src="${q.imageUrl}" alt="" style="max-width:200px;margin-top:0.5rem;border-radius:4px" />` : ""}
@@ -341,6 +564,7 @@ async function showQuestionForm(qId) {
     body.append("question", document.getElementById("q-question").value);
     body.append("answer", document.getElementById("q-answer").value);
     body.append("keywords", document.getElementById("q-keywords").value);
+    body.append("difficulty", document.getElementById("q-difficulty").value);
     const imageFile = document.getElementById("q-image").files[0];
     if (imageFile) body.append("image", imageFile);
 
@@ -357,7 +581,6 @@ async function showQuestionForm(qId) {
   });
 }
 
-// --- Play ---
 async function playQuestion(qId) {
   const container = document.getElementById("questions-container");
   container.innerHTML = '<p class="loading">Loading...</p>';
@@ -368,7 +591,8 @@ async function playQuestion(qId) {
     container.innerHTML = `
       <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
       <div class="question-form-wrapper" style="text-align:center">
-        <div class="play-question-text">${q.question}</div>
+        ${difficultyBadge(q.difficulty)}
+        <div class="play-question-text" style="margin-top:0.5rem">${q.question}</div>
         ${q.imageUrl ? `<img class="question-image" src="${q.imageUrl}" alt="" style="margin:0 auto 1rem">` : ""}
         ${
           q.keywords && q.keywords.length
@@ -425,7 +649,6 @@ async function playQuestion(qId) {
   }
 }
 
-// --- Delete ---
 async function deleteQuestion(qId) {
   if (!confirm("Are you sure you want to delete this question?")) return;
 
@@ -442,7 +665,6 @@ function handleLogout() {
   showAuth();
 }
 
-// --- Init ---
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("logout-btn").addEventListener("click", handleLogout);
   if (getToken()) {

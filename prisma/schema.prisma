@@ -20,6 +20,7 @@ model User {
   name     String @db.VarChar(100)
   questions    Question[]
   attempts     Attempt[]
+  comments Comment[]
   @@map("users")
 
 }
@@ -29,12 +30,26 @@ model Question {
   question    String    @db.VarChar(255)
   date     DateTime
   answer  String    @db.Text
+  difficulty String @default("medium") @db.VarChar(20)
   keywords Keyword[]
   imageUrl String?  @db.VarChar(255)
   userId   Int
   user     User @relation(fields: [userId], references: [id])
   attempts     Attempt[]
+  comments     Comment[] 
   @@map("questions")
+}
+
+model Comment {
+  id         Int      @id @default(autoincrement())
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  questionId Int
+  question   Question @relation(fields: [questionId], references: [id])
+
+  @@map("comments")
 }
 
 model Keyword {
